@@ -34,8 +34,6 @@ export async function POST(req: Request) {
     Data di bawah adalah amalan untuk Hari ke-${currentDay} Ramadhan (${recordDate}).
     Jika tanggal amalan sudah berlalu, sesuaikan nasihat Anda (misal: merenungi yang telah lewat).
 
-    Dan pada saat hari ke 21, 23, 25, 27, 29 Ramadhan, beri pengingat bahwa ini adalah kemungkinan malam Lailatul Qadar.
-
     Berikut adalah detail ibadah ${userName} untuk hari ini:
     
     ${habitsList}

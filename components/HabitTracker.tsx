@@ -101,7 +101,7 @@ export default function HabitTracker({ user }: { user: any }) {
     fetchHabitLogs()
   }, [user.id, supabase])
 
-useEffect(() => {
+  useEffect(() => {
     if (isFetching) return;
 
     const dayHabits = monthlyData[currentDay];
@@ -115,12 +115,10 @@ useEffect(() => {
 
     const chosenPersona = currentDay % 2 === 0 ? 'tyler' : 'keating';
     
-    // 1. Waktu Riil Saat Ini (Real-time)
     const currentFullDateTime = new Date().toLocaleString('id-ID', { 
         weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
-    // 2. Kalkulasi Tanggal dari Hari (Day) yang Sedang Dilihat
     const RAMADHAN_START_DATE = new Date('2026-02-19T00:00:00');
     const targetDate = new Date(RAMADHAN_START_DATE);
     targetDate.setDate(targetDate.getDate() + (currentDay - 1));
@@ -139,9 +137,9 @@ useEffect(() => {
           body: JSON.stringify({ 
               persona: chosenPersona, 
               habits: detailedHabits, 
-              currentDay: currentDay,          // Kirim info ini hari ke berapa
-              recordDate: formattedRecordDate, // Kirim tanggal spesifik ibadahnya
-              time: currentFullDateTime,       // Kirim jam real-time saat ini
+              currentDay: currentDay,
+              recordDate: formattedRecordDate, 
+              time: currentFullDateTime,
               userName 
           }),
         });
@@ -154,7 +152,7 @@ useEffect(() => {
         console.error("Gagal manggil AI:", error);
         setCoach({ 
           persona: chosenPersona, 
-          quote: "Koneksi batin terputus. Tetaplah dalam ketaatan."
+          quote: "Koneksi terputus. Tetaplah dalam ketaatan."
         });
       } finally {
         setIsCoachLoading(false);
@@ -263,92 +261,8 @@ useEffect(() => {
 
       {/* TAB 1: TRACKER */}
       {activeTab === 'tracker' && (
-        <div className="animate-in fade-in duration-300">
-          
-          {/* ---> UI NASIHAT ULAMA (Desain Islami Modern - Toggle UX) <--- */}
-          <div className="px-5 mb-2 mt-4">
-            {!isAdviceOpen ? (
-              <button 
-                onClick={() => setIsAdviceOpen(true)}
-                className="w-full p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all flex items-center justify-between group animate-in fade-in"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
-                    {/* Icon Scroll / Lembaran */}
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-bold text-gray-800">Tanggapan AI</p>
-                    <p className="text-xs text-gray-500">Evaluasi amal ibadah hari ini</p>
-                  </div>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-                </div>
-              </button>
-            ) : (
-              <div className={`p-6 rounded-3xl relative overflow-hidden transition-all duration-500 shadow-lg border-2 animate-in fade-in slide-in-from-top-2 ${
-                coach.persona === 'tyler' 
-                  ? 'bg-emerald-950 border-emerald-500/30 shadow-emerald-900/20' 
-                  : 'bg-slate-900 border-amber-500/30 shadow-amber-900/20'
-              }`}>
-                
-                {/* Tombol Close (X) */}
-                <button 
-                  onClick={() => setIsAdviceOpen(false)}
-                  className="absolute top-4 right-4 z-20 text-white/40 hover:text-white transition-all hover:rotate-90 duration-300"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-
-                {/* Ornamen Background */}
-                <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
-                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2L14.85 9.15L22 12L14.85 14.85L12 22L9.15 14.85L2 12L9.15 9.15L12 2Z" fill="currentColor" className={coach.persona === 'tyler' ? 'text-emerald-400' : 'text-amber-400'} />
-                  </svg>
-                </div>
-
-                <div className="flex justify-between items-start mb-3 relative z-10 pr-6">
-                  <div className="flex flex-col">
-                    <span className={`text-[11px] font-black uppercase tracking-[0.2em] mb-1 ${
-                      coach.persona === 'tyler' ? 'text-emerald-400' : 'text-amber-400'
-                    }`}>
-                      {coach.persona === 'tyler' ? 'Pengingat' : 'Motivasi'}
-                    </span>
-                    <h3 className="text-white font-bold text-[13px] flex items-center gap-2">
-                      {coach.persona === 'tyler' ? 'Jika Imam al-Bukhārī berbicara:' : "Jika Imam Al-Shafi'i berbicara:"}
-                      {isCoachLoading && (
-                        <span className="flex gap-1">
-                          <span className="w-1 h-1 rounded-full bg-current animate-bounce"></span>
-                          <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]"></span>
-                          <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]"></span>
-                        </span>
-                      )}
-                    </h3>
-                  </div>
-                </div>
-                
-                <div className={`relative z-10 min-h-[60px] flex items-center`}>
-                  <p className={`text-[15px] leading-relaxed w-full ${
-                    coach.persona === 'tyler' 
-                      ? 'text-emerald-50 font-medium' 
-                      : 'text-amber-50 italic font-serif'
-                  }`}>
-                    {isCoachLoading 
-                      ? (coach.persona === 'tyler' ? 'Menelaah riwayat amal hamba...' : 'Menimbang mutiara kebajikan...')
-                      : `${coach.quote}`
-                    }
-                  </p>
-                </div>
-
-                {/* Aksen Garis di Bawah */}
-                <div className={`h-1 w-12 rounded-full mt-4 ${
-                  coach.persona === 'tyler' ? 'bg-emerald-500/50' : 'bg-amber-500/50'
-                }`}></div>
-              </div>
-            )}
-          </div>
-
+        <div className="animate-in fade-in duration-300 pb-20"> 
+          {/* Tambahan pb-20 biar konten bawah ga ketutup tombol floating */}
 
           <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm shadow-sm rounded-b-3xl pb-4 border-b border-gray-100">
             <div className="flex overflow-x-auto hide-scrollbar gap-2 px-5 py-4 snap-x pt-6">
@@ -439,9 +353,9 @@ useEffect(() => {
                   />
                   <Bar 
                     dataKey="completed" 
-                    radius={8} // ---> UBAH JADI ANGKA 8 AJA
+                    radius={8} 
                     barSize={26} 
-                    background={{ fill: '#f1f5f9', radius: 8 }} // ---> INI JUGA UBAH JADI ANGKA 8
+                    background={{ fill: '#f1f5f9', radius: 8 }} 
                     isAnimationActive={true} 
                     animationDuration={1500}
                   >
@@ -469,6 +383,7 @@ useEffect(() => {
         </div>
       )}
 
+      {/* MODAL KONFIRMASI KUNCI HARI */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -484,6 +399,91 @@ useEffect(() => {
           </div>
         </div>
       )}
+
+      {/* ---> FLOATING AI ASSISTANT (Pojok Kiri Bawah) <--- */}
+      <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start max-w-[85vw] sm:max-w-sm">
+        
+        {/* Pesan Popup AI */}
+        {isAdviceOpen && (
+          <div className={`p-5 rounded-3xl rounded-bl-none relative overflow-hidden transition-all duration-500 shadow-2xl border-2 mb-4 animate-in fade-in slide-in-from-bottom-4 origin-bottom-left ${
+            coach.persona === 'tyler' 
+              ? 'bg-emerald-950 border-emerald-500/30 shadow-emerald-900/40' 
+              : 'bg-slate-900 border-amber-500/30 shadow-amber-900/40'
+          }`}>
+            
+            {/* Tombol Close (X) */}
+            <button 
+              onClick={() => setIsAdviceOpen(false)}
+              className="absolute top-3 right-3 z-20 text-white/40 hover:text-white transition-all hover:rotate-90 duration-300 bg-black/20 rounded-full p-1"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+
+            {/* Ornamen Background */}
+            <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
+              <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2L14.85 9.15L22 12L14.85 14.85L12 22L9.15 14.85L2 12L9.15 9.15L12 2Z" fill="currentColor" className={coach.persona === 'tyler' ? 'text-emerald-400' : 'text-amber-400'} />
+              </svg>
+            </div>
+
+            <div className="flex flex-col mb-2 relative z-10 pr-6">
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${
+                coach.persona === 'tyler' ? 'text-emerald-400' : 'text-amber-400'
+              }`}>
+                {coach.persona === 'tyler' ? 'Reminder' : 'Motivation'}
+              </span>
+              <h3 className="text-white font-bold text-[12px] flex items-center gap-2">
+                {coach.persona === 'tyler' ? 'Bismillah' : "Bismillah"}
+                {isCoachLoading && (
+                  <span className="flex gap-1">
+                    <span className="w-1 h-1 rounded-full bg-current animate-bounce"></span>
+                    <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]"></span>
+                  </span>
+                )}
+              </h3>
+            </div>
+            
+            <div className={`relative z-10`}>
+              <p className={`text-[14px] leading-relaxed w-full ${
+                coach.persona === 'tyler' 
+                  ? 'text-emerald-50 font-medium' 
+                  : 'text-amber-50 italic font-serif'
+              }`}>
+                {isCoachLoading 
+                  ? (coach.persona === 'tyler' ? 'Menelaah ...' : 'Menimbang ...')
+                  : `"${coach.quote}"`
+                }
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Tombol Bulat Pemicu AI (Sang Asisten) */}
+        <button 
+          onClick={() => setIsAdviceOpen(!isAdviceOpen)}
+          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 border-2 hover:scale-110 active:scale-95 ${
+            isAdviceOpen 
+              ? 'bg-gray-800 border-gray-600 text-white rotate-12' 
+              : coach.persona === 'tyler' 
+                ? 'bg-emerald-600 border-emerald-400 text-white animate-pulse' 
+                : 'bg-amber-500 border-amber-300 text-white animate-pulse'
+          }`}
+        >
+          {isAdviceOpen ? (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+          ) : (
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+          )}
+          
+          {/* Notification Dot */}
+          {!isAdviceOpen && (
+            <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 border-2 border-white rounded-full"></span>
+          )}
+        </button>
+
+      </div>
+
       <style dangerouslySetInnerHTML={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
     </div>
   )
