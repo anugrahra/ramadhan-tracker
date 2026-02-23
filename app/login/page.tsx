@@ -1,23 +1,34 @@
 // app/login/page.tsx
 'use client'
 
-// 1. Ubah import-nya menjadi createClient
 import { createClient } from '@/utils/supabase/client'
 import { useState } from 'react'
 
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false)
-
-  // 2. Panggil supabase client di dalam komponen
   const supabase = createClient()
 
   const handleGoogleLogin = async () => {
     setIsLoading(true)
+
+    // Fungsi sakti biar gak nyasar ke localhost pas di Vercel
+    const getURL = () => {
+      let url =
+        process?.env?.NEXT_PUBLIC_SITE_URL ?? // Utamakan URL dari env
+        process?.env?.NEXT_PUBLIC_VERCEL_URL ?? // URL otomatis dari Vercel
+        window.location.origin; // Fallback ke origin browser
+      
+      // Pastikan formatnya bener (pake https dan akhiri dengan slash)
+      url = url.includes('http') ? url : `https://${url}`
+      url = url.endsWith('/') ? url : `${url}/`
+      return url
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // Nanti setelah login Google, akan diarahkan ke sini
-        redirectTo: `${location.origin}/auth/callback`, 
+        // Balik ke auth/callback sesuai domain tempat aplikasi jalan
+        redirectTo: `${getURL()}auth/callback`, 
       },
     })
 
@@ -45,10 +56,9 @@ export default function LoginPage() {
         <button
           onClick={handleGoogleLogin}
           disabled={isLoading}
-          className="group relative flex w-full justify-center rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 transition-all"
+          className="group relative flex w-full justify-center rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 transition-all active:scale-95"
         >
           <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-            {/* Logo Google sederhana pakai SVG */}
             <svg className="h-5 w-5" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"

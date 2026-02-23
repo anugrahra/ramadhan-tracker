@@ -3,6 +3,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts'
 
 type Habit = {
   id: string
@@ -11,9 +12,7 @@ type Habit = {
   checked: boolean
 }
 
-// URUTAN SUDAH DIGANTI DIMULAI DARI MAGHRIB
 const habitTemplate: Habit[] = [
-  // Wajib
   { id: 'w4', name: 'Shalat Maghrib', type: 'wajib', checked: false },
   { id: 'w5', name: 'Shalat Isya', type: 'wajib', checked: false },
   { id: 'w1', name: 'Shalat Subuh', type: 'wajib', checked: false },
@@ -21,15 +20,11 @@ const habitTemplate: Habit[] = [
   { id: 'w3', name: 'Shalat Ashar', type: 'wajib', checked: false },
   { id: 'w6', name: 'Puasa Ramadhan', type: 'wajib', checked: false },
   { id: 'w7', name: 'Baca Al-Quran', type: 'wajib', checked: false },
-  
-  // Rawatib
   { id: 'r4', name: 'Ba\'diyah Maghrib (2 Rakaat)', type: 'rawatib', checked: false },
   { id: 'r5', name: 'Ba\'diyah Isya (2 Rakaat)', type: 'rawatib', checked: false },
   { id: 'r1', name: 'Qabliyah Subuh (2 Rakaat)', type: 'rawatib', checked: false },
   { id: 'r2', name: 'Qabliyah Dzuhur (2/4 Rakaat)', type: 'rawatib', checked: false },
   { id: 'r3', name: 'Ba\'diyah Dzuhur (2 Rakaat)', type: 'rawatib', checked: false },
-
-  // Sunnah Lainnya
   { id: 's1', name: 'Tarawih + Witir', type: 'sunnah', checked: false },
   { id: 's2', name: 'Sedekah Subuh', type: 'sunnah', checked: false },
   { id: 's3', name: 'Shalat Dhuha', type: 'sunnah', checked: false },
@@ -49,12 +44,8 @@ const getIslamicDay = () => {
   const now = new Date();
   const diffTime = now.getTime() - RAMADHAN_START_DATE.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
   let dayCalculation = diffDays + 1;
-  if (now.getHours() >= 18) {
-    dayCalculation += 1;
-  }
-
+  if (now.getHours() >= 18) dayCalculation += 1;
   if (dayCalculation < 1) return 1;
   if (dayCalculation > 30) return 30;
   return dayCalculation;
@@ -63,16 +54,20 @@ const getIslamicDay = () => {
 export default function HabitTracker({ user }: { user: any }) {
   const supabase = createClient()
 
+  const [activeTab, setActiveTab] = useState<'tracker' | 'stats'>('tracker')
+  const [isAdviceOpen, setIsAdviceOpen] = useState(false)
   const [monthlyData, setMonthlyData] = useState<Record<number, Habit[]>>(generateMonthlyData())
   const [currentDay, setCurrentDay] = useState<number>(getIslamicDay())
   const [isFetching, setIsFetching] = useState(true)
-
-  // ---> INI STATE BARU BUAT FITUR LOCK (Di kodemu tadi ini nggak ada!) <---
   const [lockedDays, setLockedDays] = useState<number[]>([])
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [isLocking, setIsLocking] = useState(false)
 
+  const [coach, setCoach] = useState({ persona: 'tyler', quote: '...' })
+  const [isCoachLoading, setIsCoachLoading] = useState(true)
+
   const isCurrentDayLocked = lockedDays.includes(currentDay)
+  const userName = user?.user_metadata?.full_name || 'Hamba Allah'
 
   useEffect(() => {
     const fetchHabitLogs = async () => {
@@ -84,11 +79,9 @@ export default function HabitTracker({ user }: { user: any }) {
 
       if (!error && data) {
         const fetchedLockedDays: number[] = []
-        
         setMonthlyData(prev => {
           const newData = generateMonthlyData()
           data.forEach(log => {
-            // Deteksi kalau nemu kuncian dari database
             if (log.habit_id === 'LOCKED') {
               if (!fetchedLockedDays.includes(log.day)) fetchedLockedDays.push(log.day)
             } else {
@@ -105,18 +98,82 @@ export default function HabitTracker({ user }: { user: any }) {
       }
       setIsFetching(false)
     }
-
     fetchHabitLogs()
   }, [user.id, supabase])
 
-  const toggleHabit = async (id: string) => {
-    // Kalau udah dikunci, ga bisa diklik lagi
-    if (isCurrentDayLocked) return;
+useEffect(() => {
+    if (isFetching) return;
 
+    const dayHabits = monthlyData[currentDay];
+    if (!dayHabits) return;
+
+    const detailedHabits = dayHabits.map(h => ({
+      name: h.name,
+      type: h.type,
+      checked: h.checked
+    }));
+
+    const chosenPersona = currentDay % 2 === 0 ? 'tyler' : 'keating';
+    
+    // 1. Waktu Riil Saat Ini (Real-time)
+    const currentFullDateTime = new Date().toLocaleString('id-ID', { 
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+
+    // 2. Kalkulasi Tanggal dari Hari (Day) yang Sedang Dilihat
+    const RAMADHAN_START_DATE = new Date('2026-02-19T00:00:00');
+    const targetDate = new Date(RAMADHAN_START_DATE);
+    targetDate.setDate(targetDate.getDate() + (currentDay - 1));
+    const formattedRecordDate = targetDate.toLocaleDateString('id-ID', { 
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+    });
+
+    const getCoachAdvice = async () => {
+      setIsCoachLoading(true);
+      setCoach(prev => ({ ...prev, persona: chosenPersona })); 
+      
+      try {
+        const res = await fetch('/api/coach', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              persona: chosenPersona, 
+              habits: detailedHabits, 
+              currentDay: currentDay,          // Kirim info ini hari ke berapa
+              recordDate: formattedRecordDate, // Kirim tanggal spesifik ibadahnya
+              time: currentFullDateTime,       // Kirim jam real-time saat ini
+              userName 
+          }),
+        });
+        
+        const data = await res.json();
+        if (data.message) {
+          setCoach({ persona: chosenPersona, quote: data.message });
+        }
+      } catch (error) {
+        console.error("Gagal manggil AI:", error);
+        setCoach({ 
+          persona: chosenPersona, 
+          quote: "Koneksi batin terputus. Tetaplah dalam ketaatan."
+        });
+      } finally {
+        setIsCoachLoading(false);
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      getCoachAdvice();
+    }, 1500);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentDay, monthlyData, isFetching, userName]);
+
+
+  const toggleHabit = async (id: string) => {
+    if (isCurrentDayLocked) return;
     const targetHabit = monthlyData[currentDay].find(h => h.id === id)
     if (!targetHabit) return
-    const isCurrentlyChecked = targetHabit.checked
-    const willBeChecked = !isCurrentlyChecked
+    const willBeChecked = !targetHabit.checked
 
     setMonthlyData((prev) => ({
       ...prev,
@@ -132,18 +189,12 @@ export default function HabitTracker({ user }: { user: any }) {
     }
   }
 
-  // ---> FUNGSI KLIK KUNCI <---
   const handleLockDay = async () => {
     setIsLocking(true)
-    const { error } = await supabase
-      .from('habit_logs')
-      .insert({ user_id: user.id, day: currentDay, habit_id: 'LOCKED' })
-
+    const { error } = await supabase.from('habit_logs').insert({ user_id: user.id, day: currentDay, habit_id: 'LOCKED' })
     if (!error) {
       setLockedDays(prev => [...prev, currentDay])
       setShowConfirmModal(false)
-    } else {
-      console.error('Gagal ngunci:', error.message)
     }
     setIsLocking(false)
   }
@@ -156,156 +207,268 @@ export default function HabitTracker({ user }: { user: any }) {
   const { monthlyProgress } = useMemo(() => {
     let completed = 0;
     const totalPossible = totalDaily * TOTAL_DAYS;
-    Object.values(monthlyData).forEach(dayHabits => {
-      completed += dayHabits.filter(h => h.checked).length;
-    });
-    return {
-      monthlyProgress: Math.round((completed / totalPossible) * 100) || 0,
-    }
+    Object.values(monthlyData).forEach(dayHabits => { completed += dayHabits.filter(h => h.checked).length; });
+    return { monthlyProgress: Math.round((completed / totalPossible) * 100) || 0 }
   }, [monthlyData, totalDaily])
 
+  const statsData = useMemo(() => {
+    const counts: Record<string, { name: string; completed: number; type: string }> = {}
+    habitTemplate.forEach(h => { counts[h.id] = { name: h.name, completed: 0, type: h.type } })
+    Object.values(monthlyData).forEach(dayHabits => {
+      dayHabits.forEach(h => { if (h.checked) counts[h.id].completed += 1 })
+    })
+    return Object.values(counts)
+      .sort((a, b) => b.completed - a.completed)
+      .map(item => ({ ...item, percentage: Math.round((item.completed / TOTAL_DAYS) * 100) }))
+  }, [monthlyData])
+
   return (
-    <div className="bg-gray-50 pb-8 relative">
+    <div className="bg-gray-50 pb-8 relative min-h-screen">
       {isFetching && (
         <div className="absolute inset-0 bg-white/60 z-50 flex justify-center pt-32 backdrop-blur-sm">
           <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
         </div>
       )}
 
-      {/* Header Profile & Progress Bulanan */}
+      {/* Header Profile */}
       <div className="bg-white px-5 pt-8 pb-4 border-b border-gray-100">
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-sm font-medium text-emerald-600 mb-1">Ramadhan Mubarak,</p>
-            <h1 className="text-2xl font-bold text-gray-800 line-clamp-1">
-              {user?.user_metadata?.full_name || 'Hamba Allah'}
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-800 line-clamp-1">{userName}</h1>
           </div>
           {user?.user_metadata?.avatar_url ? (
-            <img 
-              src={user.user_metadata.avatar_url} 
-              alt="Avatar" 
-              className="w-14 h-14 rounded-full border-2 border-emerald-500 shadow-sm object-cover"
-              referrerPolicy="no-referrer"
-            />
+            <img src={user.user_metadata.avatar_url} alt="Avatar" className={`w-14 h-14 rounded-full border-2 border-emerald-500 shadow-sm object-cover transition-all duration-700 ${coach.persona === 'tyler' ? 'grayscale opacity-90' : 'sepia-[.3]'}`} referrerPolicy="no-referrer" />
           ) : (
             <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center border-2 border-emerald-500">
-              <span className="text-emerald-700 font-bold text-xl">U</span>
+              <span className="text-emerald-700 font-bold text-xl">{userName.charAt(0).toUpperCase()}</span>
             </div>
           )}
         </div>
 
-        <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mb-2">
+        <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mb-4">
           <div className="flex justify-between text-xs mb-2 font-bold text-indigo-800 uppercase tracking-wider">
-            <span>Progres 1 Bulan</span>
-            <span>{monthlyProgress}%</span>
+            <span>Progres 1 Bulan</span><span>{monthlyProgress}%</span>
           </div>
           <div className="w-full bg-indigo-200 rounded-full h-2.5 overflow-hidden">
-            <div
-              className="bg-indigo-600 h-2.5 rounded-full transition-all duration-1000 ease-out"
-              style={{ width: `${monthlyProgress}%` }}
-            ></div>
+            <div className="bg-indigo-600 h-2.5 rounded-full transition-all duration-1000 ease-out" style={{ width: `${monthlyProgress}%` }}></div>
           </div>
+        </div>
+
+        <div className="flex bg-gray-100 p-1 rounded-xl">
+          <button onClick={() => setActiveTab('tracker')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === 'tracker' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Ibadah Harian</button>
+          <button onClick={() => setActiveTab('stats')} className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === 'stats' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Statistik Bulan Ini</button>
         </div>
       </div>
 
-      {/* STICKY SECTION: Navigasi Hari */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm shadow-sm rounded-b-3xl pb-4 border-b border-gray-100">
-        <div className="flex overflow-x-auto hide-scrollbar gap-2 px-5 py-4 snap-x">
-          {Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1).map((day) => (
-            <button
-              key={day}
-              onClick={() => setCurrentDay(day)}
-              className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl border-2 transition-all relative ${
-                currentDay === day 
-                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-md transform scale-105' 
-                  : 'bg-white border-gray-200 text-gray-500 hover:border-emerald-300'
-              }`}
-            >
-              <span className="text-xs font-medium opacity-80">Hari</span>
-              <span className="text-lg font-bold">{day}</span>
-              {/* ---> IKON GEMBOK DI SLIDER HARI <--- */}
-              {lockedDays.includes(day) && (
-                <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-800 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+      {/* TAB 1: TRACKER */}
+      {activeTab === 'tracker' && (
+        <div className="animate-in fade-in duration-300">
+          
+          {/* ---> UI NASIHAT ULAMA (Desain Islami Modern - Toggle UX) <--- */}
+          <div className="px-5 mb-2 mt-4">
+            {!isAdviceOpen ? (
+              <button 
+                onClick={() => setIsAdviceOpen(true)}
+                className="w-full p-4 rounded-2xl bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all flex items-center justify-between group animate-in fade-in"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                    {/* Icon Scroll / Lembaran */}
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-gray-800">Tanggapan AI</p>
+                    <p className="text-xs text-gray-500">Evaluasi amal ibadah hari ini</p>
+                  </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
+                </div>
+              </button>
+            ) : (
+              <div className={`p-6 rounded-3xl relative overflow-hidden transition-all duration-500 shadow-lg border-2 animate-in fade-in slide-in-from-top-2 ${
+                coach.persona === 'tyler' 
+                  ? 'bg-emerald-950 border-emerald-500/30 shadow-emerald-900/20' 
+                  : 'bg-slate-900 border-amber-500/30 shadow-amber-900/20'
+              }`}>
+                
+                {/* Tombol Close (X) */}
+                <button 
+                  onClick={() => setIsAdviceOpen(false)}
+                  className="absolute top-4 right-4 z-20 text-white/40 hover:text-white transition-all hover:rotate-90 duration-300"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+
+                {/* Ornamen Background */}
+                <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
+                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L14.85 9.15L22 12L14.85 14.85L12 22L9.15 14.85L2 12L9.15 9.15L12 2Z" fill="currentColor" className={coach.persona === 'tyler' ? 'text-emerald-400' : 'text-amber-400'} />
+                  </svg>
+                </div>
+
+                <div className="flex justify-between items-start mb-3 relative z-10 pr-6">
+                  <div className="flex flex-col">
+                    <span className={`text-[11px] font-black uppercase tracking-[0.2em] mb-1 ${
+                      coach.persona === 'tyler' ? 'text-emerald-400' : 'text-amber-400'
+                    }`}>
+                      {coach.persona === 'tyler' ? 'Pengingat' : 'Motivasi'}
+                    </span>
+                    <h3 className="text-white font-bold text-[13px] flex items-center gap-2">
+                      {coach.persona === 'tyler' ? 'Jika Imam al-Bukhārī berbicara:' : "Jika Imam Al-Shafi'i berbicara:"}
+                      {isCoachLoading && (
+                        <span className="flex gap-1">
+                          <span className="w-1 h-1 rounded-full bg-current animate-bounce"></span>
+                          <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.15s]"></span>
+                          <span className="w-1 h-1 rounded-full bg-current animate-bounce [animation-delay:-0.3s]"></span>
+                        </span>
+                      )}
+                    </h3>
+                  </div>
+                </div>
+                
+                <div className={`relative z-10 min-h-[60px] flex items-center`}>
+                  <p className={`text-[15px] leading-relaxed w-full ${
+                    coach.persona === 'tyler' 
+                      ? 'text-emerald-50 font-medium' 
+                      : 'text-amber-50 italic font-serif'
+                  }`}>
+                    {isCoachLoading 
+                      ? (coach.persona === 'tyler' ? 'Menelaah riwayat amal hamba...' : 'Menimbang mutiara kebajikan...')
+                      : `${coach.quote}`
+                    }
+                  </p>
+                </div>
+
+                {/* Aksen Garis di Bawah */}
+                <div className={`h-1 w-12 rounded-full mt-4 ${
+                  coach.persona === 'tyler' ? 'bg-emerald-500/50' : 'bg-amber-500/50'
+                }`}></div>
+              </div>
+            )}
+          </div>
+
+
+          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm shadow-sm rounded-b-3xl pb-4 border-b border-gray-100">
+            <div className="flex overflow-x-auto hide-scrollbar gap-2 px-5 py-4 snap-x pt-6">
+              {Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1).map((day) => {
+                const isOddLastTen = day >= 21 && day % 2 !== 0;
+                const isSelected = currentDay === day;
+                return (
+                  <button key={day} onClick={() => setCurrentDay(day)} className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl border-2 transition-all relative ${isSelected ? (isOddLastTen ? 'bg-indigo-600 border-indigo-400 text-amber-300 shadow-[0_0_15px_rgba(79,70,229,0.5)] scale-105' : 'bg-emerald-500 border-emerald-500 text-white shadow-md scale-105') : (isOddLastTen ? 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:border-indigo-400 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-emerald-300')}`}>
+                    <span className={`text-[10px] font-bold uppercase tracking-wider z-10 ${isOddLastTen && isSelected ? 'text-indigo-200' : 'opacity-80'}`}>Hari</span>
+                    <span className={`text-xl font-black leading-none z-10 ${isOddLastTen && !isSelected ? 'drop-shadow-sm' : ''}`}>{day}</span>
+                    {isOddLastTen && <span className={`absolute top-1 right-1 text-[10px] ${isSelected ? 'opacity-100' : 'opacity-60'}`}>✨</span>}
+                    {lockedDays.includes(day) && (
+                      <div className="absolute -top-2 -right-2 w-6 h-6 bg-gray-800 rounded-full flex items-center justify-center border-2 border-white shadow-md z-20">
+                        <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="px-5">
+              <div className="flex justify-between text-sm mb-1.5 font-bold text-gray-700">
+                <span>Progres Hari Ke-{currentDay}</span><span className="text-emerald-600">{dailyProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                <div className="bg-emerald-500 h-2 rounded-full transition-all duration-500 ease-out" style={{ width: `${dailyProgress}%` }}></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-5 mt-6 space-y-8">
+            <section>
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-6 bg-emerald-500 rounded-full"></span>Ibadah Wajib</h2>
+              <div className="space-y-3">{activeHabits.filter((h) => h.type === 'wajib').map((habit) => (<HabitCard key={habit.id} habit={habit} onToggle={() => toggleHabit(habit.id)} colorTheme="emerald" isLocked={isCurrentDayLocked} />))}</div>
+            </section>
+            <section>
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-6 bg-indigo-500 rounded-full"></span>Shalat Rawatib</h2>
+              <div className="space-y-3">{activeHabits.filter((h) => h.type === 'rawatib').map((habit) => (<HabitCard key={habit.id} habit={habit} onToggle={() => toggleHabit(habit.id)} colorTheme="indigo" isLocked={isCurrentDayLocked} />))}</div>
+            </section>
+            <section>
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2"><span className="w-2 h-6 bg-amber-400 rounded-full"></span>Sunnah Lainnya</h2>
+              <div className="space-y-3">{activeHabits.filter((h) => h.type === 'sunnah').map((habit) => (<HabitCard key={habit.id} habit={habit} onToggle={() => toggleHabit(habit.id)} colorTheme="amber" isLocked={isCurrentDayLocked} />))}</div>
+            </section>
+
+            <div className="pt-4 border-t border-gray-200 mt-8">
+              {!isCurrentDayLocked ? (
+                <button onClick={() => setShowConfirmModal(true)} className="w-full py-4 bg-gray-900 hover:bg-gray-800 active:scale-95 text-white font-bold rounded-2xl shadow-lg transition-all flex justify-center items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg> Setor & Kunci Hari {currentDay}
+                </button>
+              ) : (
+                <div className="w-full py-4 bg-gray-100 text-gray-500 font-bold rounded-2xl border-2 border-gray-200 flex justify-center items-center gap-2 cursor-not-allowed">
+                  <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg> Hari {currentDay} Telah Dikunci
                 </div>
               )}
-            </button>
-          ))}
-        </div>
-
-        <div className="px-5">
-          <div className="flex justify-between text-sm mb-1.5 font-bold text-gray-700">
-            <span>Progres Hari Ke-{currentDay}</span>
-            <span className="text-emerald-600">{dailyProgress}%</span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-emerald-500 h-2 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${dailyProgress}%` }}
-            ></div>
-          </div>
-        </div>
-      </div>
-
-      {/* LIST HABIT */}
-      <div className="px-5 mt-6 space-y-8">
-        <section>
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-2 h-6 bg-emerald-500 rounded-full"></span>
-            Ibadah Wajib
-          </h2>
-          <div className="space-y-3">
-            {activeHabits.filter((h) => h.type === 'wajib').map((habit) => (
-              <HabitCard key={habit.id} habit={habit} onToggle={() => toggleHabit(habit.id)} colorTheme="emerald" isLocked={isCurrentDayLocked} />
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-2 h-6 bg-indigo-500 rounded-full"></span>
-            Shalat Rawatib
-          </h2>
-          <div className="space-y-3">
-            {activeHabits.filter((h) => h.type === 'rawatib').map((habit) => (
-              <HabitCard key={habit.id} habit={habit} onToggle={() => toggleHabit(habit.id)} colorTheme="indigo" isLocked={isCurrentDayLocked} />
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <span className="w-2 h-6 bg-amber-400 rounded-full"></span>
-            Sunnah Lainnya
-          </h2>
-          <div className="space-y-3">
-            {activeHabits.filter((h) => h.type === 'sunnah').map((habit) => (
-              <HabitCard key={habit.id} habit={habit} onToggle={() => toggleHabit(habit.id)} colorTheme="amber" isLocked={isCurrentDayLocked} />
-            ))}
-          </div>
-        </section>
-
-        {/* ---> INI DIA TOMBOL KUNCINYA BRO! <--- */}
-        <div className="pt-4 border-t border-gray-200 mt-8">
-          {!isCurrentDayLocked ? (
-            <button
-              onClick={() => setShowConfirmModal(true)}
-              className="w-full py-4 bg-gray-900 hover:bg-gray-800 active:scale-95 text-white font-bold rounded-2xl shadow-lg transition-all flex justify-center items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-              Setor & Kunci Hari {currentDay}
-            </button>
-          ) : (
-            <div className="w-full py-4 bg-gray-100 text-gray-500 font-bold rounded-2xl border-2 border-gray-200 flex justify-center items-center gap-2 cursor-not-allowed">
-              <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
-              Hari {currentDay} Telah Dikunci
             </div>
-          )}
+          </div>
         </div>
-      </div>
-      
-      {/* ---> MODAL POP UP BUAT KONFIRMASI <--- */}
+      )}
+
+      {/* TAB 2: STATS CHART */}
+      {activeTab === 'stats' && (
+        <div className="px-5 mt-6 animate-in slide-in-from-right-4 duration-300">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-gray-800">Leaderboard Ibadah</h2>
+            <p className="text-sm text-gray-500">Lihat mana ibadah yang paling mantap dan mana yang masih sering bolong di bulan ini.</p>
+          </div>
+          <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+            <div className="h-[750px] w-full"> 
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={statsData} layout="vertical" margin={{ top: 10, right: 35, left: 0, bottom: 0 }}>
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" width={110} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#4b5563', fontWeight: 600 }} />
+                  <Tooltip 
+                    cursor={{fill: '#f3f4f6'}}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-gray-900 text-white p-3 rounded-xl shadow-xl text-sm border border-gray-700">
+                            <p className="font-bold mb-1">{data.name}</p>
+                            <p className="text-gray-300">Dikerjakan: <span className="text-emerald-400 font-bold">{data.completed}</span> hari</p>
+                            <p className="text-gray-300">Persentase: <span className="text-amber-400 font-bold">{data.percentage}%</span></p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar 
+                    dataKey="completed" 
+                    radius={8} // ---> UBAH JADI ANGKA 8 AJA
+                    barSize={26} 
+                    background={{ fill: '#f1f5f9', radius: 8 }} // ---> INI JUGA UBAH JADI ANGKA 8
+                    isAnimationActive={true} 
+                    animationDuration={1500}
+                  >
+                    {statsData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.type === 'wajib' ? '#10b981' : entry.type === 'rawatib' ? '#6366f1' : '#fbbf24'} />
+                    ))}
+                    <LabelList 
+                      dataKey="completed" 
+                      position="right" 
+                      formatter={(val: string | number | boolean | null | undefined) => 
+                        (typeof val === 'number' || typeof val === 'string') ? `${val}x` : ''
+                      } 
+                      style={{ fill: '#6b7280', fontSize: 12, fontWeight: 'bold' }} 
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="mt-6 flex flex-wrap gap-3 text-xs font-medium text-gray-500 justify-center">
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500"></span> Wajib</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-indigo-500"></span> Rawatib</span>
+            <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400"></span> Sunnah</span>
+          </div>
+        </div>
+      )}
+
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -313,38 +476,19 @@ export default function HabitTracker({ user }: { user: any }) {
               <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
             <h3 className="text-xl font-bold text-center text-gray-900 mb-2">Kunci Ibadah Hari {currentDay}?</h3>
-            <p className="text-sm text-center text-gray-600 mb-6">
-              Kalau sudah dikunci, lu <span className="font-bold text-red-500">tidak bisa mengubah</span> ceklis ibadah di hari ini lagi lho. Yakin udah semua?
-            </p>
+            <p className="text-sm text-center text-gray-600 mb-6">Kalau sudah dikunci, Anda <span className="font-bold text-red-500">tidak bisa mengubah</span> ceklis ibadah di hari ini lagi. Yakin sudah semua?</p>
             <div className="flex gap-3">
-              <button 
-                onClick={() => setShowConfirmModal(false)}
-                className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors"
-                disabled={isLocking}
-              >
-                Batal
-              </button>
-              <button 
-                onClick={handleLockDay}
-                className="flex-1 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors flex justify-center items-center"
-                disabled={isLocking}
-              >
-                {isLocking ? 'Ngunci...' : 'Ya, Kunci!'}
-              </button>
+              <button onClick={() => setShowConfirmModal(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition-colors" disabled={isLocking}>Batal</button>
+              <button onClick={handleLockDay} className="flex-1 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors flex justify-center items-center" disabled={isLocking}>{isLocking ? 'Mengunci...' : 'Ya, Kunci!'}</button>
             </div>
           </div>
         </div>
       )}
-
-      <style dangerouslySetInnerHTML={{__html: `
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      `}} />
+      <style dangerouslySetInnerHTML={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
     </div>
   )
 }
 
-// ---> Komponen Card ini juga udah update nerima prop isLocked <---
 function HabitCard({ habit, onToggle, colorTheme, isLocked }: { habit: Habit; onToggle: () => void; colorTheme: 'emerald' | 'indigo' | 'amber'; isLocked: boolean }) {
   const theme = {
     emerald: { bgActive: 'bg-emerald-50', borderActive: 'border-emerald-400', textActive: 'text-emerald-700', iconBg: 'bg-emerald-500', iconBorder: 'border-emerald-500', hoverBorder: 'hover:border-emerald-200' },
@@ -353,24 +497,10 @@ function HabitCard({ habit, onToggle, colorTheme, isLocked }: { habit: Habit; on
   }[colorTheme]
 
   return (
-    <div
-      onClick={isLocked ? undefined : onToggle}
-      className={`group flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
-        isLocked ? (habit.checked ? `${theme.bgActive} border-gray-200 opacity-80 cursor-not-allowed` : 'bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed')
-        : (habit.checked ? `${theme.bgActive} ${theme.borderActive} shadow-sm cursor-pointer` : `bg-white border-gray-100 shadow-sm ${theme.hoverBorder} cursor-pointer`)
-      }`}
-    >
-      <span className={`font-medium transition-all ${habit.checked ? `${theme.textActive} line-through opacity-70` : 'text-gray-700'}`}>
-        {habit.name}
-      </span>
-      <div className={`flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all duration-300 ${
-        habit.checked 
-          ? `${isLocked ? 'bg-gray-400 border-gray-400' : `${theme.iconBg} ${theme.iconBorder}`} scale-110` 
-          : 'bg-gray-50 border-gray-300'
-      }`}>
-        <svg className={`w-4 h-4 text-white transition-opacity duration-300 ${habit.checked ? 'opacity-100' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-        </svg>
+    <div onClick={isLocked ? undefined : onToggle} className={`group flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${isLocked ? (habit.checked ? `${theme.bgActive} border-gray-200 opacity-80 cursor-not-allowed` : 'bg-gray-50 border-gray-100 opacity-60 cursor-not-allowed') : (habit.checked ? `${theme.bgActive} ${theme.borderActive} shadow-sm cursor-pointer` : `bg-white border-gray-100 shadow-sm ${theme.hoverBorder} cursor-pointer`)}`}>
+      <span className={`font-medium transition-all ${habit.checked ? `${theme.textActive} line-through opacity-70` : 'text-gray-700'}`}>{habit.name}</span>
+      <div className={`flex items-center justify-center w-7 h-7 rounded-full border-2 transition-all duration-300 ${habit.checked ? `${isLocked ? 'bg-gray-400 border-gray-400' : `${theme.iconBg} ${theme.iconBorder}`} scale-110` : 'bg-gray-50 border-gray-300'}`}>
+        <svg className={`w-4 h-4 text-white transition-opacity duration-300 ${habit.checked ? 'opacity-100' : 'opacity-0'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
       </div>
     </div>
   )
