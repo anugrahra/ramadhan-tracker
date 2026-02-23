@@ -327,7 +327,7 @@ export default function HabitTracker({ user }: { user: any }) {
         <div className="px-5 mt-6 animate-in slide-in-from-right-4 duration-300">
           <div className="mb-6">
             <h2 className="text-xl font-bold text-gray-800">Leaderboard Ibadah</h2>
-            <p className="text-sm text-gray-500">Lihat mana ibadah yang paling mantap dan mana yang masih sering bolong di bulan ini.</p>
+            <p className="text-sm text-gray-500">Lihat statistik ibadah yang telah dikerjakan.</p>
           </div>
           <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
             <div className="h-[750px] w-full"> 
@@ -430,8 +430,9 @@ export default function HabitTracker({ user }: { user: any }) {
               <span className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${
                 coach.persona === 'tyler' ? 'text-emerald-400' : 'text-amber-400'
               }`}>
-                {coach.persona === 'tyler' ? 'Reminder' : 'Motivation'}
+                {coach.persona === 'tyler' ? 'Pengingat' : 'Motivasi'}
               </span>
+
               <h3 className="text-white font-bold text-[12px] flex items-center gap-2">
                 {coach.persona === 'tyler' ? 'Bismillah' : "Bismillah"}
                 {isCoachLoading && (
@@ -443,11 +444,11 @@ export default function HabitTracker({ user }: { user: any }) {
                 )}
               </h3>
             </div>
-            
+
             <div className={`relative z-10`}>
               <p className={`text-[14px] leading-relaxed w-full ${
                 coach.persona === 'tyler' 
-                  ? 'text-emerald-50 font-medium' 
+                  ? 'text-emerald-50 italic font-serif' 
                   : 'text-amber-50 italic font-serif'
               }`}>
                 {isCoachLoading 
@@ -456,6 +457,13 @@ export default function HabitTracker({ user }: { user: any }) {
                 }
               </p>
             </div>
+            {/* ---> DISCLAIMER AI DI SINI <--- */}
+            <div className="relative z-10 mt-3 pt-3 border-t border-white/10">
+              <p className="text-[9px] text-white/40 text-center italic tracking-wide">
+                Teks ini dihasilkan oleh AI dan bisa saja keliru.
+              </p>
+            </div>
+
           </div>
         )}
 
@@ -474,11 +482,6 @@ export default function HabitTracker({ user }: { user: any }) {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
           ) : (
             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-          )}
-          
-          {/* Notification Dot */}
-          {!isAdviceOpen && (
-            <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 border-2 border-white rounded-full"></span>
           )}
         </button>
 
