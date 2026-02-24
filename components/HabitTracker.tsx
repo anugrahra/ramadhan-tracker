@@ -66,6 +66,12 @@ export default function HabitTracker({ user }: { user: any }) {
   const [coach, setCoach] = useState({ persona: 'tyler', quote: '...' })
   const [isCoachLoading, setIsCoachLoading] = useState(true)
 
+  // ---> STATE KHUSUS JURNAL ZEN MODE <---
+  const [isJournalOpen, setIsJournalOpen] = useState(false)
+  const [journalContent, setJournalContent] = useState('')
+  const [initialJournal, setInitialJournal] = useState('')
+  const [isSavingJournal, setIsSavingJournal] = useState(false)
+
   const isCurrentDayLocked = lockedDays.includes(currentDay)
   const userName = user?.user_metadata?.full_name || 'Hamba Allah'
 
@@ -100,6 +106,27 @@ export default function HabitTracker({ user }: { user: any }) {
     }
     fetchHabitLogs()
   }, [user.id, supabase])
+
+  // ---> FETCH DATA JURNAL DARI DATABASE <---
+  useEffect(() => {
+    const fetchJournal = async () => {
+      const { data, error } = await supabase
+        .from('journal_logs')
+        .select('content')
+        .eq('user_id', user.id)
+        .eq('day', currentDay)
+        .single() // Ambil tepat 1 data
+
+      if (data && data.content) {
+        setJournalContent(data.content)
+        setInitialJournal(data.content)
+      } else {
+        setJournalContent('')
+        setInitialJournal('')
+      }
+    }
+    fetchJournal()
+  }, [currentDay, user.id, supabase])
 
   useEffect(() => {
     if (isFetching) return;
@@ -197,6 +224,35 @@ export default function HabitTracker({ user }: { user: any }) {
     setIsLocking(false)
   }
 
+  // ---> FUNGSI UNTUK MENYIMPAN JURNAL <---
+  const handleSaveJournal = async () => {
+    setIsSavingJournal(true)
+    try {
+      const { error } = await supabase
+        .from('journal_logs')
+        .upsert(
+          { 
+            user_id: user.id, 
+            day: currentDay, 
+            content: journalContent, 
+            updated_at: new Date().toISOString() 
+          },
+          { onConflict: 'user_id, day' } // Upsert magic: Insert kalau baru, Update kalau ada
+        )
+
+      if (!error) {
+        setInitialJournal(journalContent)
+        setIsJournalOpen(false) // Nutup laci otomatis setelah tersimpan
+      } else {
+        console.error("Gagal menyimpan jurnal:", error)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsSavingJournal(false)
+    }
+  }
+
   const activeHabits = monthlyData[currentDay]
   const totalDaily = activeHabits.length
   const completedDaily = activeHabits.filter((h) => h.checked).length
@@ -232,7 +288,17 @@ export default function HabitTracker({ user }: { user: any }) {
       <div className="bg-white px-5 pt-8 pb-4 border-b border-gray-100">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-sm font-medium text-emerald-600 mb-1">Ramadhan Mubarak,</p>
+            <div className="flex items-center gap-3 mb-1">
+              <p className="text-sm font-medium text-emerald-600">Ramadhan Mubarak,</p>
+              {/* ---> TOMBOL PENA KECIL JURNAL DI HEADER <--- */}
+              <button 
+                onClick={() => setIsJournalOpen(true)}
+                className="text-emerald-600 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 p-1.5 rounded-full transition-all flex items-center shadow-sm border border-emerald-100/50"
+                title="Tulis Jurnal Refleksi"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+              </button>
+            </div>
             <h1 className="text-2xl font-bold text-gray-800 line-clamp-1">{userName}</h1>
           </div>
           {user?.user_metadata?.avatar_url ? (
@@ -401,7 +467,7 @@ export default function HabitTracker({ user }: { user: any }) {
       )}
 
       {/* ---> FLOATING AI ASSISTANT (Pojok Kiri Bawah) <--- */}
-      <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start max-w-[85vw] sm:max-w-sm">
+      <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start max-w-[85vw] sm:max-w-sm">
         
         {/* Pesan Popup AI */}
         {isAdviceOpen && (
@@ -411,7 +477,6 @@ export default function HabitTracker({ user }: { user: any }) {
               : 'bg-slate-900 border-amber-500/30 shadow-amber-900/40'
           }`}>
             
-            {/* Tombol Close (X) */}
             <button 
               onClick={() => setIsAdviceOpen(false)}
               className="absolute top-3 right-3 z-20 text-white/40 hover:text-white transition-all hover:rotate-90 duration-300 bg-black/20 rounded-full p-1"
@@ -419,7 +484,6 @@ export default function HabitTracker({ user }: { user: any }) {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
 
-            {/* Ornamen Background */}
             <div className="absolute top-0 right-0 p-2 opacity-10 pointer-events-none">
               <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M12 2L14.85 9.15L22 12L14.85 14.85L12 22L9.15 14.85L2 12L9.15 9.15L12 2Z" fill="currentColor" className={coach.persona === 'tyler' ? 'text-emerald-400' : 'text-amber-400'} />
@@ -457,17 +521,17 @@ export default function HabitTracker({ user }: { user: any }) {
                 }
               </p>
             </div>
-            {/* ---> DISCLAIMER AI DI SINI <--- */}
+            
+            {/* DISCLAIMER AI */}
             <div className="relative z-10 mt-3 pt-3 border-t border-white/10">
               <p className="text-[9px] text-white/40 text-center italic tracking-wide">
                 Teks ini dihasilkan oleh AI dan bisa saja keliru.
               </p>
             </div>
-
           </div>
         )}
 
-        {/* Tombol Bulat Pemicu AI (Sang Asisten) */}
+        {/* Tombol Bulat Pemicu AI */}
         <button 
           onClick={() => setIsAdviceOpen(!isAdviceOpen)}
           className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 border-2 hover:scale-110 active:scale-95 ${
@@ -484,8 +548,53 @@ export default function HabitTracker({ user }: { user: any }) {
             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
           )}
         </button>
-
       </div>
+
+      {/* ---> LACI ZEN MODE JURNAL (Bottom Sheet) <--- */}
+      {isJournalOpen && (
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-gray-900/40 backdrop-blur-sm transition-all duration-500 animate-in fade-in">
+          <div className="bg-[#faf9f6] w-full h-[88vh] rounded-t-[2rem] shadow-[0_-10px_40px_rgba(0,0,0,0.15)] flex flex-col animate-in slide-in-from-bottom-full duration-500">
+            
+            {/* Header Laci */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200/60">
+              <button onClick={() => setIsJournalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 bg-gray-100 rounded-full transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+              
+              <div className="text-center">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700/60">Hari {currentDay}</p>
+                <p className="text-sm font-serif text-gray-700">Jurnal Refleksi</p>
+              </div>
+              
+              <button
+                onClick={handleSaveJournal}
+                disabled={isSavingJournal || journalContent === initialJournal}
+                className={`text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
+                  journalContent !== initialJournal && !isSavingJournal 
+                    ? 'bg-emerald-600 text-white shadow-md active:scale-95 hover:bg-emerald-700' 
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              >
+                {isSavingJournal ? (
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                ) : 'Simpan'}
+              </button>
+            </div>
+
+            {/* Area Kanvas Tulisan */}
+            <div className="flex-1 p-6 sm:px-10 overflow-y-auto hide-scrollbar">
+              <textarea
+                value={journalContent}
+                onChange={(e) => setJournalContent(e.target.value)}
+                placeholder="Ada cerita atau keluh kesah apa hari ini?"
+                className="w-full h-full bg-transparent resize-none outline-none font-serif text-gray-800 text-lg sm:text-xl leading-relaxed placeholder:text-gray-300 placeholder:italic"
+                autoFocus
+              />
+            </div>
+            
+          </div>
+        </div>
+      )}
 
       <style dangerouslySetInnerHTML={{__html: `.hide-scrollbar::-webkit-scrollbar { display: none; } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}} />
     </div>
