@@ -193,6 +193,24 @@ export default function HabitTracker({ user }: { user: any }) {
     return () => clearTimeout(timeoutId);
   }, [currentDay, monthlyData, isFetching, userName]);
 
+  // ---> LOGIKA AUTO-CENTER TANGGAL <---
+  useEffect(() => {
+    // Cuma jalanin kalau kita lagi di tab 'tracker' biar ga error
+    if (activeTab === 'tracker') {
+      // Cari tombol berdasarkan ID hari ini
+      const activeBtn = document.getElementById(`day-btn-${currentDay}`);
+      if (activeBtn) {
+        // Kasih delay super dikit (100ms) buat mastiin UI udah selesai di-render
+        setTimeout(() => {
+          activeBtn.scrollIntoView({ 
+            behavior: 'smooth', // Biar gesernya mulus nggak patah
+            inline: 'center',   // Posisinya otomatis pas di tengah layar
+            block: 'nearest'    // Biar layar atas-bawahnya ga ikut loncat
+          });
+        }, 100);
+      }
+    }
+  }, [currentDay, activeTab]); // Akan jalan tiap tanggal berubah atau ganti tab
 
   const toggleHabit = async (id: string) => {
     if (isCurrentDayLocked) return;
@@ -336,7 +354,12 @@ export default function HabitTracker({ user }: { user: any }) {
                 const isOddLastTen = day >= 21 && day % 2 !== 0;
                 const isSelected = currentDay === day;
                 return (
-                  <button key={day} onClick={() => setCurrentDay(day)} className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl border-2 transition-all relative ${isSelected ? (isOddLastTen ? 'bg-indigo-600 border-indigo-400 text-amber-300 shadow-[0_0_15px_rgba(79,70,229,0.5)] scale-105' : 'bg-emerald-500 border-emerald-500 text-white shadow-md scale-105') : (isOddLastTen ? 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:border-indigo-400 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-emerald-300')}`}>
+                  <button 
+                    key={day} 
+                    id={`day-btn-${day}`} // ---> TAMBAHAN ID DI SINI <---
+                    onClick={() => setCurrentDay(day)} 
+                    className={`snap-center flex-shrink-0 flex flex-col items-center justify-center w-14 h-16 rounded-2xl border-2 transition-all relative ${isSelected ? (isOddLastTen ? 'bg-indigo-600 border-indigo-400 text-amber-300 shadow-[0_0_15px_rgba(79,70,229,0.5)] scale-105' : 'bg-emerald-500 border-emerald-500 text-white shadow-md scale-105') : (isOddLastTen ? 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:border-indigo-400 shadow-sm' : 'bg-white border-gray-200 text-gray-500 hover:border-emerald-300')}`}
+                  >
                     <span className={`text-[10px] font-bold uppercase tracking-wider z-10 ${isOddLastTen && isSelected ? 'text-indigo-200' : 'opacity-80'}`}>Hari</span>
                     <span className={`text-xl font-black leading-none z-10 ${isOddLastTen && !isSelected ? 'drop-shadow-sm' : ''}`}>{day}</span>
                     {isOddLastTen && <span className={`absolute top-1 right-1 text-[10px] ${isSelected ? 'opacity-100' : 'opacity-60'}`}>✨</span>}
@@ -349,6 +372,7 @@ export default function HabitTracker({ user }: { user: any }) {
                 )
               })}
             </div>
+
             <div className="px-5">
               <div className="flex justify-between text-sm mb-1.5 font-bold text-gray-700">
                 <span>Progres Hari Ke-{currentDay}</span><span className="text-emerald-600">{dailyProgress}%</span>
