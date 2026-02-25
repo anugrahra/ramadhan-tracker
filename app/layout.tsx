@@ -1,13 +1,12 @@
 // app/layout.tsx
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google"; // Font bawaan Next.js
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
-// ---> INI DIA TEMPAT NGUBAH TITLENYA BRO <---
 export const metadata: Metadata = {
-  title: "Tracker Ramadhan",
+  title: "Ramadhan Tracker",
   description: "Pantau ibadah dan tulis jurnal refleksi harianmu.",
   icons: {
     icon: [
@@ -18,8 +17,22 @@ export const metadata: Metadata = {
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
-  manifest: '/site.webmanifest',
-  themeColor: '#10b981', // Warna Emerald khas aplikasi lu, bikin status bar HP Android jadi estetik
+  manifest: '/site.webmanifest?v=1',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Ramadhan Habits',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#10b981',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1, // Bagus buat PWA biar user ga ga sengaja nge-zoom pas ngetik jurnal
 };
 
 export default function RootLayout({
