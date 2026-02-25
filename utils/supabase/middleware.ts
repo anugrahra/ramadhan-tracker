@@ -2,7 +2,30 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - All files in public folder (icons, manifest, etc.)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|json|webmanifest)).*)',
+  ],
+}
+
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // 1. SURAT JALAN: Izinkan file statis lewat tanpa cek login
+  if (
+    pathname.match(/\.(?:svg|png|jpg|jpeg|gif|webp|ico|json|webmanifest)$/) ||
+    pathname === '/favicon.ico'
+  ) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -32,8 +55,6 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
 
   // Kondisi 1: Jika user BELUM login dan mencoba akses halaman selain /login atau rute /auth
   if (!user && !pathname.startsWith('/login') && !pathname.startsWith('/auth')) {
