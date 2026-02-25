@@ -590,19 +590,27 @@ export default function HabitTracker({ user }: { user: any }) {
                 <p className="text-sm font-serif text-gray-700">Jurnal Refleksi</p>
               </div>
               
-              <button
-                onClick={handleSaveJournal}
-                disabled={isSavingJournal || journalContent === initialJournal}
-                className={`text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
-                  journalContent !== initialJournal && !isSavingJournal 
-                    ? 'bg-emerald-600 text-white shadow-md active:scale-95 hover:bg-emerald-700' 
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {isSavingJournal ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                ) : 'Simpan'}
-              </button>
+              {/* ---> LOGIKA TOMBOL SIMPAN vs TERKUNCI <--- */}
+              {isCurrentDayLocked ? (
+                <div className="text-xs font-bold px-4 py-2.5 rounded-xl bg-gray-100 text-gray-400 flex items-center gap-1.5 border border-gray-200 cursor-not-allowed">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                  Terkunci
+                </div>
+              ) : (
+                <button
+                  onClick={handleSaveJournal}
+                  disabled={isSavingJournal || journalContent === initialJournal}
+                  className={`text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2 ${
+                    journalContent !== initialJournal && !isSavingJournal 
+                      ? 'bg-emerald-600 text-white shadow-md active:scale-95 hover:bg-emerald-700' 
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {isSavingJournal ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  ) : 'Simpan'}
+                </button>
+              )}
             </div>
 
             {/* Area Kanvas Tulisan */}
@@ -610,9 +618,12 @@ export default function HabitTracker({ user }: { user: any }) {
               <textarea
                 value={journalContent}
                 onChange={(e) => setJournalContent(e.target.value)}
-                placeholder="Ada cerita atau keluh kesah apa hari ini?"
-                className="w-full h-full bg-transparent resize-none outline-none font-serif text-gray-800 text-lg sm:text-xl leading-relaxed placeholder:text-gray-300 placeholder:italic"
-                autoFocus
+                placeholder={isCurrentDayLocked ? "Tidak ada catatan yang ditulis pada hari ini." : "Ada cerita atau keluh kesah apa hari ini?"}
+                className={`w-full h-full bg-transparent resize-none outline-none font-serif text-lg sm:text-xl leading-relaxed placeholder:italic transition-colors ${
+                  isCurrentDayLocked ? 'text-gray-500 placeholder:text-gray-300 cursor-not-allowed' : 'text-gray-800 placeholder:text-gray-300'
+                }`}
+                autoFocus={!isCurrentDayLocked}
+                readOnly={isCurrentDayLocked} // Bikin teks ga bisa diedit kalau udah dikunci
               />
             </div>
             
